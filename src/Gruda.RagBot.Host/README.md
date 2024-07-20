@@ -1,0 +1,1 @@
+﻿* use `dotnet watch run` and `npx tailwindcss -i tailwind.css -o wwwroot/app.css` to run the project in dev and change the ui

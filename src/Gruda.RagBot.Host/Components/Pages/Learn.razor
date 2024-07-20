@@ -1,0 +1,28 @@
+﻿@page "/learn"
+@rendermode InteractiveServer
+@using Gruda.RagBot.Kernel
+
+<PageTitle>Chat</PageTitle>
+
+<h1>Learn</h1>
+
+<InputTextArea @bind-Value="UserInput"></InputTextArea>
+<button @onclick="LearnText">Send</button>
+
+
+@code {
+    [Parameter] public string? UserInput { get; set; }
+
+    [Inject] private KernelService? KernelService { get; set; }
+
+    async Task LearnText()
+    {
+        if (string.IsNullOrEmpty(UserInput))
+            return;
+
+        await KernelService!.CreateTextEmbedding(UserInput);
+
+        UserInput = "";
+    }
+
+}

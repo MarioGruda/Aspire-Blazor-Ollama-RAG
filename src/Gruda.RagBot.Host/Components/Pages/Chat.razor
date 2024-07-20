@@ -1,0 +1,109 @@
+﻿@page "/"
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+
+@using Gruda.RagBot.Kernel
+@using Microsoft.SemanticKernel.ChatCompletion
+
+<PageTitle>Chat with your AI Bot</PageTitle>
+
+<div class="pt-4 h-full">
+    <img src="bot.png"
+         alt="bot"
+         class="w-20 h-20 rounded-full ring-2 ring-white ring-offset-2 mx-auto hover:rotate-12 transition-transform"/>
+
+    <div class="overflow-y-auto h-[calc(100%-9rem)] pt-4 pb-4">
+        <div class="container mx-auto space-y-4">
+            @foreach (var message in ChatHistory)
+            {
+                <div class="flex gap-2 @(message.Role == AuthorRole.User ? "flex-row-reverse" : "")">
+                    <img src="@(message.Role == AuthorRole.User ? "you.png" : "bot.png")"
+                         alt="Brain"
+                         class="w-12 h-12 rounded-full"/>
+                    <div class="self-center">
+                        <p class="bg-neutral-600 rounded-xl px-4 py-2">
+                            @((MarkupString)Markdig.Markdown.ToHtml(message.ToString()))
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="mx-auto container">
+        <EditForm Model="@this"
+                  OnValidSubmit="GetChatResponse"
+                  FormName="UserInputForm">
+            <div class="text-white relative">
+
+                <InputText class="w-full bg-neutral-700 pl-6 py-4 rounded-full placeholder-neutral-300 focus:outline-none peer"
+                           placeholder="Send a message"
+                           @bind-Value="UserInput"
+                           required/>
+                <button type="submit"
+                        class=" px-2 py-2 rounded-full absolute right-2 top-2 peer-placeholder-shown:bg-neutral-500 bg-white transition-colors"
+                        title="send input"
+                        disabled="@IsGeneratingOutput">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="2"
+                         stroke="currentColor"
+                         class="size-6 text-neutral-700">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
+                    </svg>
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm] public string? UserInput { get; set; }
+
+    private ChatHistory ChatHistory { get; } =
+    [
+        new(AuthorRole.Assistant, "Hello! How can I help you?"),
+    ];
+
+    private bool IsGeneratingOutput { get; set; }
+
+    [Inject] private KernelService? KernelService { get; set; }
+
+    async Task GetChatResponse()
+    {
+        if (string.IsNullOrEmpty(UserInput) || IsGeneratingOutput)
+            return;
+
+        IsGeneratingOutput = true;
+
+        string userInput = UserInput;
+        UserInput = "";
+        ChatHistory.AddMessage(AuthorRole.User, userInput);
+
+        ChatHistory.AddMessage(AuthorRole.Assistant, "...");
+
+        try
+        {
+            await foreach (var content in KernelService!.GetResponseStreamed(userInput, new()))
+            {
+                if (ChatHistory[^1].Content == "...")
+                {
+                    ChatHistory[^1].Content = content.ToString();
+                    StateHasChanged();
+                    continue;
+                }
+
+                ChatHistory[^1].Content += content;
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            IsGeneratingOutput = false;
+        }
+    }
+
+}
